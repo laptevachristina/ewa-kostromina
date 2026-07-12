@@ -26,9 +26,9 @@
   font-family:var(--sans);
 }
 .slide.f916{height:960px}
-.slide:before{content:"";position:absolute;top:0;left:0;right:0;height:14px;z-index:5;background:repeating-linear-gradient(135deg,#000 0 12px,#fff 12px 24px)}
-.slide[data-type="burst"]:before{content:none}
-.slide[data-type="quote2"]:before{content:none}
+.top-ribbon{position:absolute;top:0;left:0;right:0;height:14px;z-index:5;background:repeating-linear-gradient(135deg,#000 0 12px,#fff 12px 24px)}
+.tr-del{position:absolute;top:-15px;right:2px;width:44px;height:44px;cursor:pointer;z-index:9;touch-action:none;user-select:none}
+.tr-del:before{content:"\2715";position:absolute;top:11px;right:11px;width:23px;height:23px;border-radius:999px;background:#c0655c;box-shadow:0 1px 5px rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;color:#fff;font-size:12px}
 .slide *{box-sizing:border-box}
 .slide.dark{color:var(--milk)}
 .slide.dark .kicker,.slide.dark .sub{color:rgba(244,238,224,.82)}
@@ -565,6 +565,7 @@ function makeSlide(type,bg,html,f916){
     if(type==='collage'){var cv=el.querySelector('[data-canvas]');[{x:40,y:170,w:215,h:250},{x:270,y:170,w:232,h:158},{x:270,y:344,w:232,h:214}].forEach(function(o){addFrame(cv,o);});}
     if(type==='final'){var cv2=el.querySelector('[data-canvas]');addFrame(cv2,{x:130,y:70,w:280,h:280,round:true});}
     if(type==='burst'){var cv3=el.querySelector('[data-canvas]');addFrame(cv3,{x:160,y:246,w:220,h:220,round:true});}
+    if(type!=='burst'&&type!=='quote2')addTopRibbon(el);
   }
   wireSlide(el);
   return el;
@@ -1331,12 +1332,28 @@ function wireFrameEl(fr){
 }
 
 /* ---- wire a whole slide (used on build AND on undo-restore) ---- */
+function wireTopRibbonDel(btn){
+  btn.addEventListener('pointerdown',function(e){e.stopPropagation();e.preventDefault();});
+  btn.addEventListener('pointerup',function(e){
+    e.stopPropagation();
+    var rb=btn.closest('.top-ribbon');if(rb)rb.remove();
+    if(typeof updateFilm==='function')updateFilm();
+    if(typeof pushHistory==='function')pushHistory();
+  });
+}
+function addTopRibbon(el){
+  var r=document.createElement('div');r.className='top-ribbon';
+  var del=document.createElement('span');del.className='tr-del';
+  r.appendChild(del);el.appendChild(r);
+  wireTopRibbonDel(del);
+}
 function wireSlide(el){
   el.querySelectorAll('[data-edit]').forEach(wireEditable);
   el.querySelectorAll('[data-photo]').forEach(wirePhoto);
   el.querySelectorAll('.frame').forEach(wireFrameEl);
   el.querySelectorAll('.sticker').forEach(wireSticker);
   el.querySelectorAll('.vidclip').forEach(wireVideoClip);
+  el.querySelectorAll('.tr-del').forEach(wireTopRibbonDel);
 }
 
 /* ---- hist: undo / redo ---- */
@@ -1643,7 +1660,7 @@ function renderSlideCanvas(el,animState,videoFrameMap){
     clone.style.transform='none';clone.style.boxShadow='none';clone.style.borderRadius='0';clone.style.background='transparent';
     var fontcss=document.getElementById('fontcss').textContent;
     var slidecss=document.getElementById('slidecss').textContent;
-    var extra=".ph-empty:before{content:''!important}.ph-label,.fr-label{display:none!important}.ph-pick,.gcell-move,.fr-del,.fr-resize,.fr-move,.mv-handle,.mv-del,.tx-resize,.type-toggle,.snap-guide{display:none!important}.frame{outline:none!important;box-shadow:none!important;background:transparent!important}.photo{background:transparent!important}.ph-img{display:none!important}.slide{background:transparent!important}[data-edit]{box-shadow:none!important}.sticker{display:none!important}.vidclip{display:none!important}";
+    var extra=".ph-empty:before{content:''!important}.ph-label,.fr-label{display:none!important}.ph-pick,.gcell-move,.fr-del,.fr-resize,.fr-move,.mv-handle,.mv-del,.tx-resize,.type-toggle,.snap-guide,.tr-del{display:none!important}.frame{outline:none!important;box-shadow:none!important;background:transparent!important}.photo{background:transparent!important}.ph-img{display:none!important}.slide{background:transparent!important}[data-edit]{box-shadow:none!important}.sticker{display:none!important}.vidclip{display:none!important}";
     var xml=new XMLSerializer().serializeToString(clone);
     var svg='<svg xmlns="http://www.w3.org/2000/svg" width="'+w+'" height="'+h+'"><style>'+fontcss+slidecss+extra+'</style><foreignObject x="0" y="0" width="'+w+'" height="'+h+'"><div xmlns="http://www.w3.org/1999/xhtml">'+xml+'</div></foreignObject></svg>';
     var overlay=new Image();
