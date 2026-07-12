@@ -199,7 +199,8 @@ header .logo b{color:var(--ui-acc);font-weight:700}
 .dd-row{display:flex;gap:8px}
 .dd-row .dd-btn{flex:1;text-align:center;padding:8px 8px}
 .btn-grp{display:inline-flex;gap:6px}
-.ctl-top{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.ctl-top{display:flex;gap:8px;flex-wrap:nowrap;overflow-x:auto;touch-action:pan-x;-webkit-overflow-scrolling:touch;align-items:center}
+.ctl-top>*{flex:0 0 auto}
 .swatches.dd{display:none;position:fixed;z-index:60;max-width:300px;background:var(--ui-panel);border:1px solid var(--ui-line);padding:10px;border-radius:12px;box-shadow:0 12px 30px rgba(0,0,0,.5)}
 .txtmenu.dd{display:none;position:fixed;z-index:60;min-width:180px;background:var(--ui-panel);border:1px solid var(--ui-line);padding:8px;border-radius:12px;box-shadow:0 12px 30px rgba(0,0,0,.5)}
 .txtmenu.dd.open{display:flex;flex-direction:column;gap:6px}
