@@ -185,7 +185,7 @@ body{background:var(--ui-bg);color:var(--ui-text);font-family:'Inter',system-ui,
 
 header{display:flex;align-items:center;gap:10px;padding:calc(12px + env(safe-area-inset-top,0px)) calc(14px + env(safe-area-inset-right,0px)) 12px calc(14px + env(safe-area-inset-left,0px));border-bottom:1px solid var(--ui-line);flex-wrap:wrap;position:sticky;top:0;z-index:20;background:var(--ui-panel)}
 header .logo{font-family:'Montserrat',sans-serif;font-weight:800;font-size:18px;display:inline-flex;align-items:center;gap:6px;color:var(--ui-text)}
-.birdlogo{height:22px;width:22px;flex:0 0 auto}
+.birdlogo{height:24px;width:24px;flex:0 0 auto;border-radius:5px;object-fit:cover}
 header .logo b{color:var(--ui-acc);font-weight:700}
 .grow{flex:1}
 .seg{display:inline-flex;background:var(--ui-panel-2);border-radius:9px;padding:3px}
@@ -277,9 +277,11 @@ header .logo b{color:var(--ui-acc);font-weight:700}
   .seg{flex:0 0 auto;padding:2px}
   .seg button{padding:6px 8px;font-size:11px}
   .hbtn{padding:8px 11px;font-size:12px;flex:0 0 auto}
-  .ctl-top{gap:6px}
-  .ctl-top .hbtn{padding:6px 8px;font-size:11px}
-  .ctl-top .btn-grp{gap:4px}
+  .ctl-top{gap:5px}
+  .ctl-top .hbtn{padding:5px 7px;font-size:10px}
+  .ctl-top .btn-grp{gap:3px}
+  .fmtbar button{padding:5px 7px;font-size:10px}
+  .fmtbar{gap:5px}
   .pad{padding:44px}
   .hint{display:none}
   .stage{padding:4px;min-height:0}
@@ -289,7 +291,7 @@ header .logo b{color:var(--ui-acc);font-weight:700}
 
 <div class="app">
   <header>
-    <div class="logo"><svg class="birdlogo" viewBox="0 0 130 100" aria-hidden="true" style="color:var(--ui-acc)"><rect x="4" y="20" width="30" height="9" rx="2"/><rect x="4" y="40" width="30" height="9" rx="2"/><path d="M42 62 Q50 34 58 62 Q66 90 74 62" fill="none" stroke="currentColor" stroke-width="9" stroke-linecap="round"/><polygon points="92,66 108,30 124,66"/></svg></div>
+    <div class="logo"><img class="birdlogo" src="data:image/svg+xml;base64,PD94bWwgdmVyc2lvbj0iMS4wIiBlbmNvZGluZz0iVVRGLTgiPz4NCjwhRE9DVFlQRSBzdmcgUFVCTElDICItLy9XM0MvL0RURCBTVkcgMS4xLy9FTiIgImh0dHA6Ly93d3cudzMub3JnL0dyYXBoaWNzL1NWRy8xLjEvRFREL3N2ZzExLmR0ZCI+DQo8IS0tIENyZWF0b3I6IENvcmVsRFJBVyBYNyAtLT4NCjxzdmcgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIiB4bWw6c3BhY2U9InByZXNlcnZlIiB3aWR0aD0iMjAwbW0iIGhlaWdodD0iMjAwbW0iIHZlcnNpb249IjEuMSIgc3R5bGU9InNoYXBlLXJlbmRlcmluZzpnZW9tZXRyaWNQcmVjaXNpb247IHRleHQtcmVuZGVyaW5nOmdlb21ldHJpY1ByZWNpc2lvbjsgaW1hZ2UtcmVuZGVyaW5nOm9wdGltaXplUXVhbGl0eTsgZmlsbC1ydWxlOmV2ZW5vZGQ7IGNsaXAtcnVsZTpldmVub2RkIg0Kdmlld0JveD0iMCAwIDIwMDAwIDIwMDAwIg0KIHhtbG5zOnhsaW5rPSJodHRwOi8vd3d3LnczLm9yZy8xOTk5L3hsaW5rIj4NCiA8ZGVmcz4NCiAgPHN0eWxlIHR5cGU9InRleHQvY3NzIj4NCiAgIDwhW0NEQVRBWw0KICAgIC5zdHIwIHtzdHJva2U6IzJCMkEyOTtzdHJva2Utd2lkdGg6MjB9DQogICAgLmZpbDAge2ZpbGw6IzJCMkEyOX0NCiAgICAuZmlsMiB7ZmlsbDojMTMxMzEzfQ0KICAgIC5maWwxIHtmaWxsOiNGREZFRkV9DQogICBdXT4NCiAgPC9zdHlsZT4NCiA8L2RlZnM+DQogPGcgaWQ9ItCh0LvQvtC5X3gwMDIwXzEiPg0KICA8bWV0YWRhdGEgaWQ9IkNvcmVsQ29ycElEXzBDb3JlbC1MYXllciIvPg0KICA8cmVjdCBjbGFzcz0iZmlsMCBzdHIwIiB3aWR0aD0iMjAwMDAiIGhlaWdodD0iMjAwMDAiLz4NCiAgPGcgaWQ9Il84MzQ0OTA5MjgiPg0KICAgPHBhdGggY2xhc3M9ImZpbDEiIGQ9Ik04MjE5IDg2NjJjMzQ4LDE0MiAzMjUsMTE2MyA5MjgsMTE2NSA2MjMsMSA2MDgsLTExMzAgOTQ0LC0xMTU1IDMwNiwxMzggMzE4LDExNzMgOTI3LDExNTQgNTg2LC0xOCA1NTUsLTk5OSA5MTAsLTExNjVsMCAtMzQ1Yy0yOTEsLTM0IC00NjAsMjg1IC01NTEsNDg4IC03MSwxNTYgLTIzNSw2ODAgLTM5MSw2NjEgLTMxOSwtMTM2IC0zMTUsLTExNzMgLTkyOCwtMTE1NiAtNjA3LDE4IC01ODksMTEyNyAtOTI3LDExNTQgLTMwMCwtMTQwIC0zNDUsLTExOTggLTkxMSwtMTE0OGwtMSAzNDd6Ii8+DQogICA8cGF0aCBjbGFzcz0iZmlsMSIgZD0iTTEzMDkyIDk0NjVjMTMsLTM4IDQ2NiwtNzA0IDUxMywtNzUyIDM2LDI2IDUwNiw3MDAgNTIxLDc1OGwtMTAzNCAtNnptOSAzNjVsMTA3NCAzYzIzMiwwIDM4OCwtMTA1IDM2OCwtMzQxIC0xMiwtMTQzIC00NTMsLTcxNSAtNTU2LC04NzMgLTg2LC0xMzEgLTE3OSwtMzMwIC0zOTgsLTMxOCAtMTg4LDEwIC0yOTQsMjEyIC0zNzYsMzQwbC00MzcgNjM3Yy0xMzEsMTc2IC0xNDAsMzc3IDI3LDQ5MyA5Myw2NCAxNjUsNTkgMjk4LDU5eiIvPg0KICAgPHBvbHlnb24gY2xhc3M9ImZpbDEiIHBvaW50cz0iNTQ1Miw4NjY5IDcyMTcsODY2OSA3MjIzLDgzMTEgNTQ1OSw4MzA2ICIvPg0KICAgPHBvbHlnb24gY2xhc3M9ImZpbDEiIHBvaW50cz0iNTQ1Miw5ODI4IDcyMTMsOTgyOSA3MjIwLDk0NzAgNTQ1NCw5NDY4ICIvPg0KICAgPHBhdGggY2xhc3M9ImZpbDEiIGQ9Ik02OTgxIDExMDgyYzE1MSwtMSAzMDgsLTQxIDI0MywxNTNsLTI0OCA0IDUgLTE1N3ptLTIyOSA1OTNsMjIzIDUgMiAtMjQyIDE1MyAtMyAxNTAgMjQ1IDIzMiAxIC0xNTIgLTI4NmM1OSwtODIgMTA2LC0xMTEgMTA2LC0yMzAgMCwtOTIgLTQ3LC0xNzUgLTEwMSwtMjIwIC0xMTEsLTkwIC00NTIsLTY5IC02MDksLTU3bC00IDc4N3oiLz4NCiAgIDxwYXRoIGNsYXNzPSJmaWwxIiBkPSJNOTc4OCAxMTQ4NGwyIC00MDNjMTgwLDEgMzI3LDIwIDMyOSwxOTggMywxODcgLTE2OSwyMDUgLTMzMSwyMDV6bS0yMjUgMTkzYzI4Niw2NCA3NzMsMTIgNzY4LC0zOTggLTIsLTE4MSAtMTE0LC0zMDIgLTIyNiwtMzU3IC0xMTYsLTU3IC0zODQsLTU5IC01NDAsLTM4bC0yIDc5M3oiLz4NCiAgIDxwYXRoIGNsYXNzPSJmaWwyIiBkPSJNMTMwOTIgOTQ2NWwxMDM0IDZjLTE1LC01OCAtNDg1LC03MzIgLTUyMSwtNzU4IC00Nyw0OCAtNTAwLDcxNCAtNTEzLDc1MnoiLz4NCiAgIDxwYXRoIGNsYXNzPSJmaWwxIiBkPSJNODY1NSAxMTM2MGMtMTA4LDIyMyAtNDM4LDYxIC0zMzMsLTE1OSAxMDYsLTIyMiA0MzgsLTU2IDMzMywxNTl6bS0yMzEgLTQ2N2MtNTMyLDEwNiAtMzczLDg2OCAxMzgsNzc4IDQ5NywtODcgMzc0LC04NzkgLTEzOCwtNzc4eiIvPg0KICAgPHBhdGggY2xhc3M9ImZpbDEiIGQ9Ik01NjczIDExMjM4bC00IC0xNTBjOTUsLTE1IDI0NSwtNDAgMjQzLDc3IC0yLDExMSAtMTQ0LDg1IC0yMzksNzN6bS0yMjEgNDQzbDIxOSAtMiAzIC0yMzljMTU1LC0xIDI2OSwyMSAzNjYsLTYzIDgzLC03MiAxMjUsLTE5MSA4MSwtMzEwIC04NSwtMjMyIC0zODgsLTE5MyAtNjY2LC0xODFsLTMgNzk1eiIvPg0KICAgPHBhdGggY2xhc3M9ImZpbDEiIGQ9Ik0xMTcxNyAxMDg4OWwtMTk2IC0zYy0yNSwyMTQgNjksNTcwIC0yMTAsNTczIC0yODAsNCAtMTk1LC0zMzkgLTIxNCwtNTY4bC0xOTUgLTVjLTE3LDE2NyAtMjgsNDM4IDM5LDU2OSAxNDcsMjg0IDU2NywzMjAgNzM1LC01IDY1LC0xMjYgNTYsLTQwMyA0MSwtNTYxeiIvPg0KICAgPHBhdGggY2xhc3M9ImZpbDEiIGQ9Ik0xMzA4MSAxMTY4MGw3IC0xOTNjLTIxOSwtMTcgLTUzOCw2MiAtNTUxLC0xOTMgLTE0LC0yNzIgMzIyLC0yMDIgNTQ1LC0yMTNsNSAtMTk1Yy0xNDQsLTExIC00MjEsLTIwIC01MzcsMzggLTMwNSwxNTIgLTI4OCw1NzIgLTYsNzE3IDExOCw2MCAzODksNTMgNTM3LDM5eiIvPg0KICAgPHBvbHlnb24gY2xhc3M9ImZpbDEiIHBvaW50cz0iMTM3MjMsMTEwNzcgMTQwMjUsMTEwODMgMTQwMjgsMTE2ODAgMTQyNDgsMTE2ODAgMTQyNTIsMTEwODMgMTQ1NDMsMTEwODEgMTQ1NDgsMTA4ODggMTM3MjUsMTA4ODUgIi8+DQogICA8cGF0aCBjbGFzcz0iZmlsMiIgZD0iTTk3ODggMTE0ODRjMTYyLDAgMzM0LC0xOCAzMzEsLTIwNSAtMiwtMTc4IC0xNDksLTE5NyAtMzI5LC0xOThsLTIgNDAzeiIvPg0KICAgPHBhdGggY2xhc3M9ImZpbDIiIGQ9Ik04NjU1IDExMzYwYzEwNSwtMjE1IC0yMjcsLTM4MSAtMzMzLC0xNTkgLTEwNSwyMjAgMjI1LDM4MiAzMzMsMTU5eiIvPg0KICAgPHBhdGggY2xhc3M9ImZpbDIiIGQ9Ik02OTc2IDExMjM5bDI0OCAtNGM2NSwtMTk0IC05MiwtMTU0IC0yNDMsLTE1M2wtNSAxNTd6Ii8+DQogICA8cGF0aCBjbGFzcz0iZmlsMiIgZD0iTTU2NzMgMTEyMzhjOTUsMTIgMjM3LDM4IDIzOSwtNzMgMiwtMTE3IC0xNDgsLTkyIC0yNDMsLTc3bDQgMTUweiIvPg0KICA8L2c+DQogPC9nPg0KPC9zdmc+DQo=" alt="EWA"></div>
     <div class="seg" id="mode">
       <button data-m="deck" class="on">Карусель</button>
       <button data-m="grid">Сетка</button>
@@ -312,7 +314,7 @@ header .logo b{color:var(--ui-acc);font-weight:700}
       <span class="btn-grp"><button class="hbtn iconbtn" id="undoBtn" title="Отменить">↶</button><button class="hbtn iconbtn" id="redoBtn" title="Вернуть">↷</button></span>
       <button class="hbtn dd-btn" data-dd="swatches">🎨 Фон</button>
       <button class="hbtn dd-btn" data-dd="textcolors">🅰 Цвет</button>
-      <button class="hbtn" id="addFrameBtn" style="display:none">＋ Рамка</button><span class="btn-grp"><button class="hbtn dd-btn" id="addStickerBtn" data-dd="stickermenu">＋ Стикер ▾</button><button class="hbtn" id="addVideoBtn">＋ Видео</button></span>
+      <button class="hbtn" id="addFrameBtn" style="display:none">＋Рамка</button><span class="btn-grp"><button class="hbtn dd-btn" id="addStickerBtn" data-dd="stickermenu">＋Стикер▾</button><button class="hbtn" id="addVideoBtn">＋Видео</button></span>
     </div>
     <div>
       <div class="row-title">Выделенный текст</div>
@@ -320,8 +322,8 @@ header .logo b{color:var(--ui-acc);font-weight:700}
         <button data-cmd="italic"><em>Курсив</em></button>
         <button data-cmd="underline"><span class="u">Подчеркнуть</span></button>
         <button class="dd-btn alnbtn" id="alignBtn" data-dd="alnmenu" title="Выравнивание"><svg viewBox="0 0 18 12" width="15" height="10" fill="currentColor"><rect x="0" y="0" width="18" height="2"/><rect x="3.5" y="5" width="11" height="2"/><rect x="2" y="10" width="14" height="2"/></svg> ▾</button>
-        <button class="dd-btn" id="addTextBtn" data-dd="txtmenu">＋ Текст ▾</button>
-        <button class="dd-btn" id="hlBtn" data-dd="hlmenu" title="Подложка под текст">🖍 Подложка ▾</button>
+        <button class="dd-btn" id="addTextBtn" data-dd="txtmenu">＋Текст▾</button>
+        <button class="dd-btn" id="hlBtn" data-dd="hlmenu" title="Подложка под текст">🖍Подложка</button>
       </div>
     </div>
     <div>
