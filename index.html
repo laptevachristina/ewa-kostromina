@@ -185,7 +185,7 @@ body{background:var(--ui-bg);color:var(--ui-text);font-family:'Inter',system-ui,
 
 header{display:flex;align-items:center;gap:7px;padding:calc(12px + env(safe-area-inset-top,0px)) calc(14px + env(safe-area-inset-right,0px)) 12px calc(14px + env(safe-area-inset-left,0px));border-bottom:1px solid var(--ui-line);flex-wrap:wrap;position:sticky;top:0;z-index:20;background:var(--ui-panel)}
 header .logo{font-family:'Montserrat',sans-serif;font-weight:800;font-size:18px;display:inline-flex;align-items:center;gap:6px;color:var(--ui-text)}
-.birdlogo{height:20px;width:auto;flex:0 0 auto;object-fit:contain}
+.birdlogo{height:16px;width:40px;flex:0 0 auto;object-fit:contain}
 header .logo b{color:var(--ui-acc);font-weight:700}
 .grow{flex:1}
 .seg{display:inline-flex;background:var(--ui-panel-2);border-radius:9px;padding:3px}
@@ -271,11 +271,12 @@ header .logo b{color:var(--ui-acc);font-weight:700}
 .modal .save-note{color:var(--ui-dim);font-size:13px;text-align:center;max-width:420px;margin:0 auto 4px}
 
 @media (max-width:520px){
-  header{gap:7px}
+  header{gap:5px}
   header .logo{font-size:17px}
   .seg{flex:0 0 auto;padding:2px}
-  .seg button{padding:6px 8px;font-size:11px}
-  .hbtn{padding:8px 11px;font-size:12px;flex:0 0 auto}
+  .seg button{padding:5px 7px;font-size:10px}
+  .hbtn{padding:6px 9px;font-size:11px;flex:0 0 auto}
+  header #exp-gif{padding:6px 8px;font-size:15px;line-height:1}
   .ctl-top{gap:5px}
   .ctl-top .hbtn{padding:5px 7px;font-size:10px}
   .ctl-top .btn-grp{gap:3px}
