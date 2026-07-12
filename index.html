@@ -47,6 +47,8 @@
 .body{font-family:var(--sans);font-weight:500;line-height:1.55;font-size:19px}
 .u{text-decoration:underline;text-underline-offset:3px;text-decoration-thickness:1.5px}
 em{font-style:italic}
+[data-edit].hl{position:relative}
+[data-edit].hl:before{content:"";position:absolute;left:0.33em;top:0.25em;width:var(--hl-w,100%);height:0.72em;background:var(--hl-bg,#0A0A0A)}
 
 .pill{
   display:inline-flex;align-items:center;gap:10px;align-self:flex-start;position:relative;
@@ -317,6 +319,7 @@ header .logo b{color:var(--ui-acc);font-weight:700}
         <button data-cmd="underline"><span class="u">Подчеркнуть</span></button>
         <button class="dd-btn alnbtn" id="alignBtn" data-dd="alnmenu" title="Выравнивание"><svg viewBox="0 0 18 12" width="15" height="10" fill="currentColor"><rect x="0" y="0" width="18" height="2"/><rect x="3.5" y="5" width="11" height="2"/><rect x="2" y="10" width="14" height="2"/></svg> ▾</button>
         <button class="dd-btn" id="addTextBtn" data-dd="txtmenu">＋ Текст ▾</button>
+        <button class="dd-btn" id="hlBtn" data-dd="hlmenu" title="Подложка под текст">🖍 Подложка ▾</button>
       </div>
     </div>
     <div>
@@ -361,6 +364,7 @@ header .logo b{color:var(--ui-acc);font-weight:700}
 
 <div class="swatches dd" id="swatches"></div>
 <div class="swatches dd" id="textcolors"></div>
+<div class="swatches dd" id="hlmenu"></div>
 <div class="txtmenu dd" id="txtmenu"><button data-k="h">Заголовок</button><button data-k="sub">Подзаголовок</button><button data-k="body">Обычный текст</button></div>
 <div class="txtmenu dd alnmenu" id="alnmenu"><button data-align="left">◧ Слева</button><button data-align="center">▣ По центру</button><button data-align="right">◨ Справа</button><button data-align="justify">▤ По ширине</button></div>
 <div class="swatches dd" id="cutSliderPanel" style="flex-direction:column;gap:10px;min-width:220px">
@@ -1401,6 +1405,41 @@ document.querySelectorAll('.fmtbar button[data-cmd]').forEach(function(b){
 });
 var lastEdit=null;
 document.addEventListener('focusin',function(e){var el=e.target;if(el&&el.getAttribute&&el.getAttribute('data-edit')!==null)lastEdit=el;});
+function measureTextWidth(el){
+  var span=document.createElement('span');
+  var cs=getComputedStyle(el);
+  span.style.cssText='position:absolute;visibility:hidden;white-space:pre;left:-9999px;top:0;'+
+    'font-style:'+cs.fontStyle+';font-variant:'+cs.fontVariant+';font-weight:'+cs.fontWeight+';font-size:'+cs.fontSize+';font-family:'+cs.fontFamily+';letter-spacing:'+cs.letterSpacing;
+  span.textContent=el.textContent||'';
+  document.body.appendChild(span);
+  var w=span.offsetWidth;
+  document.body.removeChild(span);
+  return w;
+}
+function updateHlWidth(el){ if(el&&el.classList.contains('hl')) el.style.setProperty('--hl-w', measureTextWidth(el)+'px'); }
+document.addEventListener('input',function(e){var el=e.target;if(el&&el.classList&&el.classList.contains('hl'))updateHlWidth(el);});
+(function(){
+  var box=document.getElementById('hlmenu');
+  if(!box)return;
+  var HL_COLORS=[{c:'#0A0A0A',name:'Чёрный'},{c:'#FFFFFF',name:'Белый'},{c:'#D6127F',name:'Маджента'},{c:'#F5C4E0',name:'Розовый светлый'}];
+  var off=document.createElement('div');off.className='sw';off.title='Без подложки';
+  off.style.cssText='background:conic-gradient(#FFFFFF 0 50%,#0A0A0A 0 100%)';
+  off.addEventListener('click',function(){
+    var el=lastEdit;if(!el){var a=document.activeElement;if(a&&a.getAttribute&&a.getAttribute('data-edit')!==null)el=a;}
+    if(el){el.classList.remove('hl');if(typeof updateFilm==='function')updateFilm();if(typeof pushHistory==='function')pushHistory();}
+    box.classList.remove('open');
+  });
+  box.appendChild(off);
+  HL_COLORS.forEach(function(c){
+    var d=document.createElement('div');d.className='sw';d.style.background=c.c;d.title=c.name;
+    d.addEventListener('click',function(){
+      var el=lastEdit;if(!el){var a=document.activeElement;if(a&&a.getAttribute&&a.getAttribute('data-edit')!==null)el=a;}
+      if(el){el.classList.add('hl');el.style.setProperty('--hl-bg',c.c);updateHlWidth(el);if(typeof updateFilm==='function')updateFilm();if(typeof pushHistory==='function')pushHistory();}
+      box.classList.remove('open');
+    });
+    box.appendChild(d);
+  });
+})();
 document.querySelectorAll('#alnmenu button[data-align]').forEach(function(b){b.addEventListener('click',function(e){e.stopPropagation();var el=lastEdit;if(!el){var a=document.activeElement;if(a&&a.getAttribute&&a.getAttribute('data-edit')!==null)el=a;}if(el&&typeof slides!=='undefined'&&slides[cur]&&slides[cur].el.contains(el)){el.style.textAlign=b.dataset.align;if(typeof updateFilm==='function')updateFilm();if(typeof pushHistory==='function')pushHistory();}var m=document.getElementById('alnmenu');if(m)m.classList.remove('open');});});
 document.querySelectorAll('#txtmenu button').forEach(function(b){b.addEventListener('click',function(e){e.stopPropagation();if(cur<0||!slides[cur])return;var el=addTextBlock(slides[cur].el,b.dataset.k);el.focus();updateFilm();pushHistory();var m=document.getElementById('txtmenu');if(m)m.classList.remove('open');});});
 document.querySelectorAll('.dd-btn').forEach(function(b){b.addEventListener('click',function(e){e.stopPropagation();var t=document.getElementById(b.dataset.dd);var wasOpen=t.classList.contains('open');document.querySelectorAll('.dd.open').forEach(function(d){d.classList.remove('open');});if(!wasOpen){var r=b.getBoundingClientRect();t.classList.add('open');var mh=t.offsetHeight||160,mw=t.offsetWidth||200;var top=r.bottom+6;if(top+mh>window.innerHeight-8){top=Math.max(8,r.top-mh-6);}t.style.top=top+'px';t.style.left=Math.max(8,Math.min(r.left,window.innerWidth-mw-8))+'px';}});});
