@@ -206,6 +206,10 @@ header .logo b{color:var(--ui-acc);font-weight:700}
 .txtmenu button{border:0;background:var(--ui-panel-2);color:var(--ui-text);border-radius:8px;padding:10px 12px;font:600 13px 'Inter',sans-serif;cursor:pointer;text-align:left}
 .swatches.dd.open{display:flex;flex-wrap:wrap;gap:8px}
 .hbtn:disabled{opacity:.32;cursor:default}
+#ffStatus{position:fixed;top:14px;left:50%;transform:translateX(-50%);background:rgba(10,10,10,.94);color:#fff;padding:11px 16px;border-radius:12px;font:600 13px 'Inter',sans-serif;z-index:100000;box-shadow:0 6px 22px rgba(0,0,0,.45);white-space:nowrap;display:none;align-items:center;gap:9px}
+#ffStatus .spin{width:15px;height:15px;border:2px solid rgba(255,255,255,.28);border-top-color:#fff;border-radius:50%;animation:ffspin .8s linear infinite;flex:0 0 auto}
+#ffStatus .fft{display:inline-block}
+@keyframes ffspin{to{transform:rotate(360deg)}}
 
 .stage{flex:1 1 auto;min-height:120px;display:grid;place-items:center;padding:12px;overflow:hidden}
 .scaler{position:relative}
@@ -2008,19 +2012,26 @@ if(gifBtn)gifBtn.addEventListener('click',function(){
       });
     });
   }).then(function(res){
-    btn.textContent='⏳ MP4…'; /* не отпускаем кнопку, пока идёт нормализация формата */
-    return ensureMp4(res.blob,res.mime,function(status,frac){btn.textContent='⏳ '+(status||'MP4')+(frac?(' '+Math.round(frac*100)+'%'):'');}).then(function(r){
+    /* статус показываем отдельной плашкой сверху — кнопка-иконка узкая, текст в неё не влезает */
+    showFFStatus('⏳ кодек…');
+    return ensureMp4(res.blob,res.mime,function(status,frac){setFFStatus('⏳ '+(status||'обработка')+(frac?(' '+Math.round(frac*100)+'%'):''));}).then(function(r){
+      hideFFStatus();
       videoExportBusy=false;btn.disabled=false;btn.textContent=oldText;
       openVideoModal(r.blob,r.mime);
     },function(){
+      hideFFStatus();
       videoExportBusy=false;btn.disabled=false;btn.textContent=oldText;
       openVideoModal(res.blob,res.mime); /* ffmpeg сломался — отдаём как есть */
     });
   }).catch(function(e){
+    hideFFStatus();
     videoExportBusy=false;btn.disabled=false;btn.textContent=oldText;
     alert('Не получилось собрать видео — напиши мне, поправим.');
   });
 });
+function showFFStatus(t){var e=document.getElementById('ffStatus');if(!e){e=document.createElement('div');e.id='ffStatus';e.innerHTML='<span class="spin"></span><span class="fft"></span>';document.body.appendChild(e);}e.querySelector('.fft').textContent=t;e.style.display='flex';}
+function setFFStatus(t){var e=document.getElementById('ffStatus');if(e)e.querySelector('.fft').textContent=t;}
+function hideFFStatus(){var e=document.getElementById('ffStatus');if(e)e.style.display='none';}
 /* ---- ffmpeg.wasm: нормализация выхлопа в честный faststart MP4 ----
    Safari пишет fragmented MP4, Chrome — WebM; ни то, ни другое Instagram/CapCut
    не принимают надёжно. Перегоняем в прогрессивный H.264/yuv420p +faststart.
@@ -2088,7 +2099,7 @@ function openVideoModal(blob,mime){
   top.addEventListener('click',function(){var a=document.createElement('a');a.href=url;a.download='slide.'+ext;document.body.appendChild(a);a.click();a.remove();});
   imgs.appendChild(top);
   var hint=document.createElement('div');hint.style.cssText='font-size:12px;line-height:1.4;color:var(--ui-mute,#888);text-align:center;max-width:300px;margin:0 auto 6px';
-  hint.innerHTML='📱 на айфоне ролик сначала падает в «Загрузки». Чтобы он оказался в галерее — открой его там и нажми «Поделиться → Сохранить видео». Либо удержи палец на видео выше → «Сохранить видео».';
+  hint.innerHTML='📱 На айфоне ролик падает в приложение «Загрузки». Открой его там → кнопка «Поделиться» → «Сохранить видео». Так он окажется в галерее.';
   imgs.appendChild(hint);
   var wrap=document.createElement('div');wrap.style.cssText='display:flex;flex-direction:column;gap:8px;align-items:center';
   var vid=document.createElement('video');vid.src=url;vid.style.maxHeight='68vh';vid.style.maxWidth='92vw';
