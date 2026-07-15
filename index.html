@@ -1632,9 +1632,9 @@ function truncateVisibleText(root,maxChars,showCursor){
     cur.style.cssText='opacity:.75';root.appendChild(cur);
   }
 }
-function renderSlideCanvas(el,animState,videoFrameMap){
+function renderSlideCanvas(el,animState,videoFrameMap,forceES){
   return new Promise(function(resolve,reject){
-    var w=540,h=el.classList.contains('f916')?960:675,ES=2;
+    var w=540,h=el.classList.contains('f916')?960:675,ES=forceES||2;
     /* measure photos at natural size (works for detached slides too) */
     var meas=document.getElementById('measurer');
     var parent=el.parentNode,next=el.nextSibling,pt=el.style.transform;
@@ -1672,29 +1672,15 @@ function renderSlideCanvas(el,animState,videoFrameMap){
       var rec={src:src,vw:vw,vh:vh,x:vc.offsetLeft,y:vc.offsetTop,W:vc.offsetWidth,H:vc.offsetHeight};
       (vc.dataset.layer==='below'?vidsBelow:vidsAbove).push(rec);
     });
-    var origTexts=el.querySelectorAll('[data-edit]');
-    var bgEntry=bgEntryOf(el),bg=bgEntry.c,clone=el.cloneNode(true);
-    if(animState){
-      var cloneTexts=clone.querySelectorAll('[data-edit]');
-      origTexts.forEach(function(orig,i){
-        var a=animState.get(orig);if(!a)return;
-        var ce=cloneTexts[i];if(!ce)return;
-        ce.style.opacity=String(a.opacity);
-        ce.style.transform='translateY('+a.dy+'px)';
-        if(a.revealChars!=null)truncateVisibleText(ce,a.revealChars,a.typing);
-      });
-    }
+    var bgEntry=bgEntryOf(el),bg=bgEntry.c;
     if(parent){parent.insertBefore(el,next);}else if(el.parentNode){el.parentNode.removeChild(el);}
     el.style.transform=pt;
-    /* overlay = text/scrim only; slide bg + photo slots + images made transparent */
-    clone.style.transform='none';clone.style.boxShadow='none';clone.style.borderRadius='0';clone.style.background='transparent';
-    var fontcss=document.getElementById('fontcss').textContent;
-    var slidecss=document.getElementById('slidecss').textContent;
-    var extra=".ph-empty:before{content:''!important}.ph-label,.fr-label{display:none!important}.ph-pick,.gcell-move,.fr-del,.fr-resize,.fr-move,.mv-handle,.mv-del,.tx-resize,.type-toggle,.snap-guide,.tr-del{display:none!important}.frame{outline:none!important;box-shadow:none!important;background:transparent!important}.photo{background:transparent!important}.ph-img{display:none!important}.slide{background:transparent!important}[data-edit]{box-shadow:none!important}.sticker{display:none!important}.vidclip{display:none!important}";
-    var xml=new XMLSerializer().serializeToString(clone);
-    var svg='<svg xmlns="http://www.w3.org/2000/svg" width="'+w+'" height="'+h+'"><style>'+fontcss+slidecss+extra+'</style><foreignObject x="0" y="0" width="'+w+'" height="'+h+'"><div xmlns="http://www.w3.org/1999/xhtml">'+xml+'</div></foreignObject></svg>';
-    var overlay=new Image();
-    overlay.onload=function(){
+    /* кеш overlay-картинки на время видео-записи: декод SVG со встроенным шрифтом (~десятки КБ base64)
+       — самая тяжёлая операция, на айфоне именно она роняла запись до ~2 кадра/сек. Кешируем один раз,
+       переиспользуем каждый кадр. Кеш включён только при _recording и без анимации (статичный текст). */
+    var useOVcache=_recording&&!animState;
+    var cached=useOVcache?_ovCache.get(el):null;
+    function compose(overlay){
       try{
         var c=document.createElement('canvas');c.width=w*ES;c.height=h*ES;
         var ctx=c.getContext('2d');ctx.scale(ES,ES);
@@ -1744,7 +1730,29 @@ function renderSlideCanvas(el,animState,videoFrameMap){
         vidsAbove.forEach(drawVid);
         resolve(c);
       }catch(e){reject(e);}
-    };
+    }
+    if(cached){compose(cached);return;}
+    /* overlay = text/scrim only; slide bg + photo slots + images made transparent */
+    var clone=el.cloneNode(true);
+    if(animState){
+      var origTexts=el.querySelectorAll('[data-edit]');
+      var cloneTexts=clone.querySelectorAll('[data-edit]');
+      origTexts.forEach(function(orig,i){
+        var a=animState.get(orig);if(!a)return;
+        var ce=cloneTexts[i];if(!ce)return;
+        ce.style.opacity=String(a.opacity);
+        ce.style.transform='translateY('+a.dy+'px)';
+        if(a.revealChars!=null)truncateVisibleText(ce,a.revealChars,a.typing);
+      });
+    }
+    clone.style.transform='none';clone.style.boxShadow='none';clone.style.borderRadius='0';clone.style.background='transparent';
+    var fontcss=document.getElementById('fontcss').textContent;
+    var slidecss=document.getElementById('slidecss').textContent;
+    var extra=".ph-empty:before{content:''!important}.ph-label,.fr-label{display:none!important}.ph-pick,.gcell-move,.fr-del,.fr-resize,.fr-move,.mv-handle,.mv-del,.tx-resize,.type-toggle,.snap-guide,.tr-del{display:none!important}.frame{outline:none!important;box-shadow:none!important;background:transparent!important}.photo{background:transparent!important}.ph-img{display:none!important}.slide{background:transparent!important}[data-edit]{box-shadow:none!important}.sticker{display:none!important}.vidclip{display:none!important}";
+    var xml=new XMLSerializer().serializeToString(clone);
+    var svg='<svg xmlns="http://www.w3.org/2000/svg" width="'+w+'" height="'+h+'"><style>'+fontcss+slidecss+extra+'</style><foreignObject x="0" y="0" width="'+w+'" height="'+h+'"><div xmlns="http://www.w3.org/1999/xhtml">'+xml+'</div></foreignObject></svg>';
+    var overlay=new Image();
+    overlay.onload=function(){if(useOVcache)_ovCache.set(el,overlay);compose(overlay);};
     overlay.onerror=function(){reject(new Error('render'));};
     overlay.src='data:image/svg+xml;charset=utf-8,'+encodeURIComponent(svg);
   });
@@ -1835,6 +1843,7 @@ function animStateAt(items,elapsedMs,spinMode,typeSchedule){
   });
   return state;
 }
+var _recording=false,_ovCache=new Map(); /* кеш overlay-картинки на время видео-записи */
 var VIDEO_FPS=16; /* было 24 — на телефоне рендер кадра (SVG-текст+фото+видео вместе) не всегда укладывается
   в 1000/24≈42мс бюджет, из-за этого реальная запись отставала от расчёта и выглядела рвано; 16фпс даёт
   каждому кадру больше времени и всё ещё смотрится гладко для этого типа анимации (не быстрое движение) */
@@ -1969,11 +1978,9 @@ if(gifBtn)gifBtn.addEventListener('click',function(){
         showProgress(avg*prepWeight);
       }).then(function(res){return {v:v,res:res};});
     })).then(function(prepared){
-      recorder.start();
-      var t0=performance.now(),frameMs=1000/VIDEO_FPS;
-      /* защита от зависания: если рендер ОДНОГО кадра почему-то не отвечает — не ждём его вечно
-         (раньше именно так выглядело "видео зациклилось на одном кадре" — весь цикл tick() просто
-         замирал на зависшем renderSlideCanvas и больше никогда не рисовал следующий кадр) */
+      var frameMs=1000/VIDEO_FPS;
+      var total=Math.max(1,Math.ceil(fullMs/frameMs));
+      var frames=[];
       function withTimeout(promise,ms){
         return new Promise(function(res,rej){
           var settled=false;
@@ -1982,31 +1989,45 @@ if(gifBtn)gifBtn.addEventListener('click',function(){
                        function(e){if(!settled){settled=true;clearTimeout(timer);rej(e);}});
         });
       }
-      function tick(){
-        var elapsed=performance.now()-t0;
-        if(elapsed>=fullMs||elapsed>fullMs+8000){resumeClips();recorder.stop();return;} /* +8с — жёсткий предохранитель */
-        showProgress(prepWeight+Math.min(1,elapsed/fullMs)*(1-prepWeight));
+      /* ПРЕДРЕНДЕР: считаем все кадры анимации заранее — в половинном разрешении (ES=1), иначе память
+         айфона не вывезет на длинных роликах; запись потом масштабирует до полного. Так тяжёлый декод
+         SVG-слоя уходит из реального времени → запись плавная, а анимация (появление текста, скролл,
+         вращение стикера, видео в кружке) сохраняется полностью. */
+      showFFStatus('расчёт кадров…');
+      function renderFrame(i){
+        var elapsed=Math.min(i*frameMs,fullMs);
         var anim=animStateAt(items,elapsed,spinMode,typeSchedule);
-        var videoFrameMap=new Map();
+        var vfm=new Map();
         prepared.forEach(function(p){
           if(!p.res.frames.length)return;
           var idx=Math.floor((elapsed/1000)*p.res.fps)%p.res.frames.length;
-          var bmp=p.res.frames[idx];
-          if(bmp)videoFrameMap.set(p.v,bmp);
+          var bmp=p.res.frames[idx]; if(bmp)vfm.set(p.v,bmp);
         });
-        withTimeout(renderSlideCanvas(el,anim,videoFrameMap),1200).then(function(canvas){
-          rctx.clearRect(0,0,recCanvas.width,recCanvas.height);
-          rctx.drawImage(canvas,0,0);
-          setTimeout(tick,frameMs);
-        })['catch'](function(){
-          /* зависший/сорвавшийся кадр — не бросаем всю запись, просто пропускаем этот кадр
-             (recCanvas останется с предыдущим кадром — не идеально, но лучше, чем полная остановка) */
-          setTimeout(tick,frameMs);
-        });
+        return withTimeout(renderSlideCanvas(el,anim,vfm,1),6000);
       }
-      tick();
+      function renderNext(i){
+        if(i>=total){ startRecording(); return; }
+        setFFStatus('расчёт '+Math.round((i/total)*100)+'%');
+        renderFrame(i).then(function(c){frames.push(c);renderNext(i+1);},
+          function(){ /* сбой кадра — дублируем последний, чтобы не рвалось */
+            frames.push(frames.length?frames[frames.length-1]:null);renderNext(i+1);});
+      }
+      function startRecording(){
+        recorder.start();
+        setFFStatus('запись…');
+        var fi=0;
+        (function tick(){
+          if(fi>=frames.length){resumeClips();recorder.stop();return;}
+          var f=frames[fi];
+          rctx.clearRect(0,0,recCanvas.width,recCanvas.height);
+          if(f)rctx.drawImage(f,0,0,recCanvas.width,recCanvas.height);
+          fi++;
+          setTimeout(tick,frameMs);
+        })();
+      }
+      renderNext(0);
       return stopped.then(function(blob){
-        prepared.forEach(function(p){p.res.frames.length=0;}); /* отпускаем ссылки на кадры-canvas'ы, чтобы GC забрал память */
+        frames.length=0; prepared.forEach(function(p){p.res.frames.length=0;});
         return {blob:blob,mime:mime};
       });
     });
