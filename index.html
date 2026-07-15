@@ -2000,7 +2000,13 @@ function exportVideo(format){
         });
       }catch(_){return Promise.resolve(null);}
     }
-    var chunks=[],recorder,stopped;
+    var chunks=[];
+    var recorder=new MediaRecorder(stream,{mimeType:mime});
+    recorder.ondataavailable=function(e){if(e.data&&e.data.size)chunks.push(e.data);};
+    var stopped=new Promise(function(resolve,reject){
+      recorder.onstop=function(){resolve(new Blob(chunks,{type:mime}));};
+      recorder.onerror=function(e){reject(e.error||new Error('recorder error'));};
+    });
     /* живая перемотка/декод видео 24 раза в секунду ненадёжна на телефоне (декодер не успевает, кадр
        застревает) — вместо этого заранее прогоняем клип целиком и сохраняем набор готовых кадров,
        во время самой записи только подставляем нужный по номеру (быстро, без гонки с декодером). */
@@ -2031,18 +2037,6 @@ function exportVideo(format){
       var audP=decodeClipAudio(v).then(function(buf){audioBuffers[idx]=buf;});
       return Promise.all([vidP,audP]).then(function(){return vidP;});
     })).then(function(prepared){
-      /* если звук не декодировался (на iOS из mp4 это часто так) — убираем пустой аудио-трек из потока,
-         иначе Safari MediaRecorder виснет на stop («запись…» и вечное ожидание). */
-      var hasAudio=audioBuffers.some(function(b){return !!b;});
-      if(!hasAudio){try{stream.getAudioTracks().forEach(function(t){stream.removeTrack(t);});}catch(_){}}
-      try{
-        recorder=new MediaRecorder(stream,{mimeType:mime});
-        recorder.ondataavailable=function(e){if(e.data&&e.data.size)chunks.push(e.data);};
-        stopped=new Promise(function(resolve,reject){
-          recorder.onstop=function(){resolve(new Blob(chunks,{type:mime}));};
-          recorder.onerror=function(e){reject(e.error||new Error('recorder error'));};
-        });
-      }catch(e){return Promise.reject(e);}
       var frameMs=1000/VIDEO_FPS;
       var total=Math.max(1,Math.ceil(fullMs/frameMs));
       var frames=[];
