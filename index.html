@@ -389,6 +389,10 @@ header .logo b{color:var(--ui-acc);font-weight:700}
 <input type="file" id="filepick" accept="image/*" style="position:fixed;top:0;left:0;width:1px;height:1px;opacity:0">
 <div id="measurer" style="position:fixed;left:-99999px;top:0;width:540px;pointer-events:none;opacity:0"></div>
 
+<!-- ffmpeg.wasm 0.12 (single-thread core — работает на GitHub Pages без COOP/COEP) -->
+<script src="https://unpkg.com/@ffmpeg/ffmpeg@0.12.10/dist/umd/ffmpeg.js"></script>
+<script src="https://unpkg.com/@ffmpeg/util@0.12.1/dist/umd/index.js"></script>
+
 <script>
 var BIRD_SVG="<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 130 100\" role=\"img\" aria-label=\"EWA PRODUCT\"><g fill=\"#0A0A0A\"><rect x=\"4\" y=\"20\" width=\"30\" height=\"9\" rx=\"2\"/><rect x=\"4\" y=\"40\" width=\"30\" height=\"9\" rx=\"2\"/><path d=\"M42 62 Q50 34 58 62 Q66 90 74 62\" fill=\"none\" stroke=\"#0A0A0A\" stroke-width=\"9\" stroke-linecap=\"round\"/><polygon points=\"92,66 108,30 124,66\"/></g></svg>";
 /* ---- viewport + PWA metas ---- */
@@ -1632,15 +1636,19 @@ function renderSlideCanvas(el,animState,videoFrameMap){
     var meas=document.getElementById('measurer');
     var parent=el.parentNode,next=el.nextSibling,pt=el.style.transform;
     el.style.transform='none';meas.appendChild(el);
-    var sr=el.getBoundingClientRect(),photos=[];
+    var sr=el.getBoundingClientRect(),photosBelow=[],photosAbove=[];
+    var hasBurstBg=!!el.querySelector('.ewa-burst-bg');
     el.querySelectorAll('[data-photo].has-img, .frame.has-img, .frame').forEach(function(p){
       var im=p.querySelector('.ph-img');if(!im||!im.complete||!im.naturalWidth||!im.src)return;
       var r=p.getBoundingClientRect(),cs=getComputedStyle(p);
       var a=animState&&animState.get(p);
-      photos.push({img:im,x:r.left-sr.left,y:r.top-sr.top,W:r.width,H:r.height,
+      var rec={img:im,x:r.left-sr.left,y:r.top-sr.top,W:r.width,H:r.height,
         rad:parseFloat(cs.borderTopLeftRadius)||0,
         s:parseFloat(p.dataset.scale)||1,tx:parseFloat(p.dataset.x)||0,ty:parseFloat(p.dataset.y)||0,
-        opacity:a?a.opacity:1,dy:a?a.dy:0});
+        opacity:a?a.opacity:1,dy:a?a.dy:0};
+      /* на «Лучах» фон-лучи (.ewa-burst-bg) лежит в overlay и непрозрачен —
+         фото кружка должно рисоваться ПОВЕРХ overlay, иначе лучи его закрасят */
+      (hasBurstBg?photosAbove:photosBelow).push(rec);
     });
     var stickersBelow=[],stickersAbove=[];
     el.querySelectorAll('.sticker').forEach(function(st){
@@ -1702,12 +1710,12 @@ function renderSlideCanvas(el,animState,videoFrameMap){
           ctx.fillStyle=bg;
           ctx.fillRect(0,0,w,h);
         }
-        photos.forEach(function(p){
+        function drawPhoto(p){
           ctx.save();ctx.globalAlpha=p.opacity;roundRectPath(ctx,p.x,p.y+p.dy,p.W,p.H,p.rad);ctx.clip();
           var nw=p.img.naturalWidth,nh=p.img.naturalHeight,cover=Math.max(p.W/nw,p.H/nh);
           var dw=nw*cover*p.s,dh=nh*cover*p.s,cx=p.x+p.W/2+p.tx,cy=p.y+p.dy+p.H/2+p.ty;
           ctx.drawImage(p.img,cx-dw/2,cy-dh/2,dw,dh);ctx.restore();
-        });
+        }
         function drawSticker(st){
           ctx.save();ctx.globalAlpha=st.opacity;
           var cx=st.x+st.W/2,cy=st.y+st.dy+st.H/2;
@@ -1726,7 +1734,9 @@ function renderSlideCanvas(el,animState,videoFrameMap){
         stickersBelow.forEach(drawSticker);
         vidsBelow.forEach(drawVid);
         ctx.globalAlpha=1;
+        photosBelow.forEach(drawPhoto);
         ctx.drawImage(overlay,0,0,w,h);
+        photosAbove.forEach(drawPhoto);
         stickersAbove.forEach(drawSticker);
         vidsAbove.forEach(drawVid);
         resolve(c);
@@ -1998,13 +2008,68 @@ if(gifBtn)gifBtn.addEventListener('click',function(){
       });
     });
   }).then(function(res){
-    videoExportBusy=false;btn.disabled=false;btn.textContent=oldText;
-    openVideoModal(res.blob,res.mime);
+    btn.textContent='⏳ MP4…'; /* не отпускаем кнопку, пока идёт нормализация формата */
+    return ensureMp4(res.blob,res.mime,function(p){btn.textContent='⏳ MP4 '+Math.round(p*100)+'%';}).then(function(r){
+      videoExportBusy=false;btn.disabled=false;btn.textContent=oldText;
+      openVideoModal(r.blob,r.mime);
+    },function(){
+      videoExportBusy=false;btn.disabled=false;btn.textContent=oldText;
+      openVideoModal(res.blob,res.mime); /* ffmpeg сломался — отдаём как есть */
+    });
   }).catch(function(e){
     videoExportBusy=false;btn.disabled=false;btn.textContent=oldText;
     alert('Не получилось собрать видео — напиши мне, поправим.');
   });
 });
+/* ---- ffmpeg.wasm: нормализация выхлопа в честный faststart MP4 ----
+   Safari пишет fragmented MP4, Chrome — WebM; ни то, ни другое Instagram/CapCut
+   не принимают надёжно. Перегоняем в прогрессивный H.264/yuv420p +faststart.
+   mp4 → просто ремюкс (-c copy, мгновенно); webm → перекод.
+   Если ffmpeg не доступен (оффлайн, старый браузер, сбой CDN) — отдаём сырой blob. */
+var FF_BASE='https://unpkg.com/@ffmpeg/core@0.12.6/dist/umd/';
+var _ff=null,_ffP=null;
+function loadFFmpeg(onProg){
+  if(_ffP)return _ffP;
+  _ffP=new Promise(function(resolve,reject){
+    /* динамическая загрузка core (wasm ~25МБ) — один раз, потом кешируется браузером */
+    if(!window.FFmpegWASM||!window.FFmpegWASM.FFmpeg||!window.FFmpegUtil){reject(new Error('no-ffmpeg-lib'));return;}
+    var ff=new FFmpegWASM.FFmpeg();
+    if(onProg)ff.on('progress',function(p){try{onProg(Math.max(0,Math.min(1,p.progress||0)));}catch(_){}});
+    ff.load({coreURL:FF_BASE+'ffmpeg-core.js',wasmURL:FF_BASE+'ffmpeg-core.wasm'}).then(function(){_ff=ff;resolve(ff);},reject);
+  });
+  return _ffP;
+}
+function ensureMp4(blob,mime,onProg){
+  /* уже честный mp4 и очень маленький — пропускаем без ffmpeg */
+  var name='in.'+((mime||'').indexOf('webm')>=0?'webm':'mp4');
+  return new Promise(function(resolve,reject){
+    if(!window.FFmpegWASM){resolve({blob:blob,mime:mime});return;}
+    loadFFmpeg(onProg).then(function(ff){
+      var fr=new FileReader();
+      fr.onload=function(){
+        var args;
+        if((mime||'').indexOf('webm')>=0){
+          args=['-i',name,'-c:v','libx264','-profile:v','baseline','-level','3.1','-pix_fmt','yuv420p','-preset','ultrafast','-movflags','+faststart','-an','out.mp4'];
+        }else{
+          /* fmp4 → прогрессивный, потоки не трогаем — мгновенно и без потерь */
+          args=['-i',name,'-c','copy','-movflags','+faststart','-an','out.mp4'];
+        }
+        ff.writeFile(name,new Uint8Array(fr.result)).then(function(){
+          ff.exec(args).then(function(){
+            ff.readFile('out.mp4').then(function(data){
+              var mp4=new Blob([data.buffer],{type:'video/mp4'});
+              /* чистим вход (out.mp4 перетёрется при след. вызове) */
+              try{ff.deleteFile(name);}catch(_){}
+              resolve({blob:mp4,mime:'video/mp4'});
+            },function(e){resolve({blob:blob,mime:mime});});
+          },function(e){resolve({blob:blob,mime:mime});});
+        },function(e){resolve({blob:blob,mime:mime});});
+      };
+      fr.onerror=function(){resolve({blob:blob,mime:mime});};
+      fr.readAsArrayBuffer(blob);
+    },function(){resolve({blob:blob,mime:mime});});
+  });
+}
 function openVideoModal(blob,mime){
   var imgs=document.getElementById('imgs');imgs.innerHTML='';
   var url=URL.createObjectURL(blob);
