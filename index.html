@@ -347,6 +347,7 @@ header .logo b{color:var(--ui-acc);font-weight:700}
         <button data-t="strips3">☰ 3 полосы</button>
         <button data-t="cta">➜ С кнопкой</button>
         <button data-t="final">✦ Финал</button>
+        <button data-t="subscribe">📋 Подписка</button>
       </div>
     </div>
     <div>
@@ -519,6 +520,15 @@ function tpl(type){
       '<div class="sub" data-edit data-ph="Подпись" style="margin-bottom:24px">лови энергию · расти с командой</div>'+
       '<span class="pill" data-edit data-ph="Кнопка">в команду&nbsp;&nbsp;<span class="arw">→</span></span>'+
     '</div>',
+  subscribe:
+    '<div class="pad" style="position:absolute;top:0;left:0;right:0;padding:32px 44px 10px;text-align:center">'+
+      '<div class="kicker" data-edit data-ph="Хук про подписку">не пропусти</div>'+
+      '<div class="h mid" data-edit data-ph="Заголовок" style="margin:6px 0 0">наш профиль</div>'+
+    '</div>'+
+    '<div class="photo" data-photo style="position:absolute;left:50px;right:50px;top:23%;bottom:23%;border-radius:18px"><div class="ph-label">нажми — скрин профиля</div></div>'+
+    '<div class="pad" style="position:absolute;bottom:0;left:0;right:0;padding:14px 44px calc(42px + env(safe-area-inset-bottom,0px));text-align:center">'+
+      '<div class="sub" data-edit data-ph="Призыв к подписке">жми кнопку ниже и подписывайся</div>'+
+    '</div>',
   splitB:
     '<div class="photo" data-photo style="position:absolute;left:0;right:0;top:0;height:60%;border-radius:0"><div class="ph-label">нажми — фото сверху</div></div>'+
     '<div class="pad" style="justify-content:flex-end;padding:38px 46px 44px">'+
@@ -555,7 +565,7 @@ function tpl(type){
   };
   return T[type]||T.quote;
 }
-var NAMES={cover:'Обложка',quote:'Цитата',collage:'Коллаж',cta:'Кнопка',final:'Финал',burst:'Лучи',splitB:'Фото сверху',splitT:'Фото снизу',splitL:'Фото справа',splitR:'Фото слева',grid4:'Сетка 4',strips3:'3 полосы'};
+var NAMES={cover:'Обложка',quote:'Цитата',collage:'Коллаж',cta:'Кнопка',final:'Финал',subscribe:'Подписка',burst:'Лучи',splitB:'Фото сверху',splitT:'Фото снизу',splitL:'Фото справа',splitR:'Фото слева',grid4:'Сетка 4',strips3:'3 полосы'};
 
 /* ---- build ---- */
 function makeSlide(type,bg,html,f916){
