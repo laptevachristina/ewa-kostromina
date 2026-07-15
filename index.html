@@ -2006,7 +2006,15 @@ function exportVideo(format){
        застревает) — вместо этого заранее прогоняем клип целиком и сохраняем набор готовых кадров,
        во время самой записи только подставляем нужный по номеру (быстро, без гонки с декодером). */
     clipEls.forEach(function(v){try{v.pause();}catch(_){}});
-    function resumeClips(){clipEls.forEach(function(v){try{v.muted=false;}catch(_){}v.play()['catch'](function(){});});}
+    function resumeClips(){clipEls.forEach(function(v){
+      /* перематываем в начало + зацикливаем: иначе после предрендера клип стоит в конце,
+         играет секунду и обрывается → звук пропадал («как..» и тишина). Так звук идёт всю запись. */
+      try{v.currentTime=0;}catch(_){}
+      try{v.loop=true;}catch(_){}
+      try{v.muted=false;}catch(_){}
+      try{v.play()['catch'](function(){});}catch(_){}
+      try{if(window._appAC&&window._appAC.state==='suspended')window._appAC.resume();}catch(_){}
+    });}
     /* прогресс-индикатор на кнопке: 0-50% — подготовка кадров клипа (если он есть), 50-100% — сама запись.
        Без клипа на слайде подготовка почти мгновенна, тогда просто крутится 0-100% на запись. */
     var prepWeight=clipEls.length?0.5:0;
