@@ -2009,7 +2009,7 @@ if(gifBtn)gifBtn.addEventListener('click',function(){
     });
   }).then(function(res){
     btn.textContent='⏳ MP4…'; /* не отпускаем кнопку, пока идёт нормализация формата */
-    return ensureMp4(res.blob,res.mime,function(p){btn.textContent='⏳ MP4 '+Math.round(p*100)+'%';}).then(function(r){
+    return ensureMp4(res.blob,res.mime,function(status,frac){btn.textContent='⏳ '+(status||'MP4')+(frac?(' '+Math.round(frac*100)+'%'):'');}).then(function(r){
       videoExportBusy=false;btn.disabled=false;btn.textContent=oldText;
       openVideoModal(r.blob,r.mime);
     },function(){
@@ -2027,47 +2027,54 @@ if(gifBtn)gifBtn.addEventListener('click',function(){
    mp4 → просто ремюкс (-c copy, мгновенно); webm → перекод.
    Если ffmpeg не доступен (оффлайн, старый браузер, сбой CDN) — отдаём сырой blob. */
 var FF_BASE='https://unpkg.com/@ffmpeg/core@0.12.6/dist/umd/';
-var _ff=null,_ffP=null;
-function loadFFmpeg(onProg){
+var _ff=null,_ffP=null,FF_TIMEOUT=false; /* единожды сбойнув, не мучаем ffmpeg до перезагрузки */
+function withTimeout(promise,ms,label){
+  return new Promise(function(res,rej){
+    var done=false;
+    var t=setTimeout(function(){if(!done){done=true;rej(new Error('timeout:'+label));}},ms);
+    promise.then(function(v){if(!done){done=true;clearTimeout(t);res(v);}},function(e){if(!done){done=true;clearTimeout(t);rej(e);}});
+  });
+}
+function loadFFmpeg(onStatus){
+  if(FF_TIMEOUT)return Promise.reject(new Error('ffmpeg-disabled'));
   if(_ffP)return _ffP;
   _ffP=new Promise(function(resolve,reject){
-    /* динамическая загрузка core (wasm ~25МБ) — один раз, потом кешируется браузером */
     if(!window.FFmpegWASM||!window.FFmpegWASM.FFmpeg||!window.FFmpegUtil){reject(new Error('no-ffmpeg-lib'));return;}
     var ff=new FFmpegWASM.FFmpeg();
-    if(onProg)ff.on('progress',function(p){try{onProg(Math.max(0,Math.min(1,p.progress||0)));}catch(_){}});
+    ff.on('log',function(_){}); /* глушим спам логов ядра */
     ff.load({coreURL:FF_BASE+'ffmpeg-core.js',wasmURL:FF_BASE+'ffmpeg-core.wasm'}).then(function(){_ff=ff;resolve(ff);},reject);
   });
-  return _ffP;
+  return withTimeout(_ffP,45000,'load');
 }
-function ensureMp4(blob,mime,onProg){
-  /* уже честный mp4 и очень маленький — пропускаем без ffmpeg */
-  var name='in.'+((mime||'').indexOf('webm')>=0?'webm':'mp4');
-  return new Promise(function(resolve,reject){
-    if(!window.FFmpegWASM){resolve({blob:blob,mime:mime});return;}
-    loadFFmpeg(onProg).then(function(ff){
+function ensureMp4(blob,mime,onStatus){
+  var raw={blob:blob,mime:mime};
+  var isWebm=(mime||'').indexOf('webm')>=0;
+  var name='in.'+(isWebm?'webm':'mp4');
+  function bail(){FF_TIMEOUT=true;return raw;} /* отмечаем что ffmpeg не пригоден — больше не пробуем */
+  return new Promise(function(resolve){
+    if(FF_TIMEOUT||!window.FFmpegWASM){resolve(raw);return;}
+    if(onStatus)onStatus('загрузка кодека…',0);
+    loadFFmpeg().then(function(ff){
+      if(onStatus)onStatus('подготовка…',0);
       var fr=new FileReader();
       fr.onload=function(){
-        var args;
-        if((mime||'').indexOf('webm')>=0){
-          args=['-i',name,'-c:v','libx264','-profile:v','baseline','-level','3.1','-pix_fmt','yuv420p','-preset','ultrafast','-movflags','+faststart','-an','out.mp4'];
-        }else{
-          /* fmp4 → прогрессивный, потоки не трогаем — мгновенно и без потерь */
-          args=['-i',name,'-c','copy','-movflags','+faststart','-an','out.mp4'];
-        }
-        ff.writeFile(name,new Uint8Array(fr.result)).then(function(){
-          ff.exec(args).then(function(){
-            ff.readFile('out.mp4').then(function(data){
-              var mp4=new Blob([data.buffer],{type:'video/mp4'});
-              /* чистим вход (out.mp4 перетёрется при след. вызове) */
+        var args=isWebm
+          ? ['-i',name,'-c:v','libx264','-profile:v','baseline','-level','3.1','-pix_fmt','yuv420p','-preset','ultrafast','-movflags','+faststart','-an','out.mp4']
+          : ['-i',name,'-c','copy','-movflags','+faststart','-an','out.mp4']; /* fmp4 → прогрессивный, мгновенно */
+        ff.on('progress',function(p){if(onStatus)try{onStatus('обработка…',Math.max(0,Math.min(1,p.progress||0)));}catch(_){}});
+        withTimeout(ff.writeFile(name,new Uint8Array(fr.result)),20000,'write').then(function(){
+          withTimeout(ff.exec(args),120000,'exec').then(function(){
+            withTimeout(ff.readFile('out.mp4'),10000,'read').then(function(data){
+              if(!data||!data.length){resolve(bail());return;}
               try{ff.deleteFile(name);}catch(_){}
-              resolve({blob:mp4,mime:'video/mp4'});
-            },function(e){resolve({blob:blob,mime:mime});});
-          },function(e){resolve({blob:blob,mime:mime});});
-        },function(e){resolve({blob:blob,mime:mime});});
+              resolve({blob:new Blob([data.buffer],{type:'video/mp4'}),mime:'video/mp4'});
+            },function(){resolve(bail());});
+          },function(){resolve(bail());});
+        },function(){resolve(bail());});
       };
-      fr.onerror=function(){resolve({blob:blob,mime:mime});};
+      fr.onerror=function(){resolve(raw);};
       fr.readAsArrayBuffer(blob);
-    },function(){resolve({blob:blob,mime:mime});});
+    },function(){resolve(bail());});
   });
 }
 function openVideoModal(blob,mime){
