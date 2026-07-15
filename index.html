@@ -2050,20 +2050,22 @@ function ensureMp4(blob,mime,onStatus){
   var raw={blob:blob,mime:mime};
   var isWebm=(mime||'').indexOf('webm')>=0;
   var name='in.'+(isWebm?'webm':'mp4');
-  function bail(){FF_TIMEOUT=true;return raw;} /* отмечаем что ffmpeg не пригоден — больше не пробуем */
+  function bail(){FF_TIMEOUT=true;return raw;}
   return new Promise(function(resolve){
     if(FF_TIMEOUT||!window.FFmpegWASM){resolve(raw);return;}
-    if(onStatus)onStatus('загрузка кодека…',0);
+    if(onStatus)onStatus('кодек…',0);
     loadFFmpeg().then(function(ff){
-      if(onStatus)onStatus('подготовка…',0);
+      if(onStatus)onStatus('обработка…',0);
       var fr=new FileReader();
       fr.onload=function(){
-        var args=isWebm
-          ? ['-i',name,'-c:v','libx264','-profile:v','baseline','-level','3.1','-pix_fmt','yuv420p','-preset','ultrafast','-movflags','+faststart','-an','out.mp4']
-          : ['-i',name,'-c','copy','-movflags','+faststart','-an','out.mp4']; /* fmp4 → прогрессивный, мгновенно */
+        /* ВСЕГДА перекод в постоянные 30 fps (CFR) — запись идёт с переменным fps, из-за чего
+           CapCut/Instagram спотыкаются и ролик дёргается/виснет. libx264 baseline+yuv420p+faststart
+           работает везде. -fps_mode cfr -r 30 выравнивает тайминги. */
+        var args=['-i',name,'-c:v','libx264','-profile:v','baseline','-level','3.1','-pix_fmt','yuv420p',
+                  '-preset','ultrafast','-r','30','-fps_mode','cfr','-movflags','+faststart','-an','out.mp4'];
         ff.on('progress',function(p){if(onStatus)try{onStatus('обработка…',Math.max(0,Math.min(1,p.progress||0)));}catch(_){}});
         withTimeout(ff.writeFile(name,new Uint8Array(fr.result)),20000,'write').then(function(){
-          withTimeout(ff.exec(args),120000,'exec').then(function(){
+          withTimeout(ff.exec(args),180000,'exec').then(function(){
             withTimeout(ff.readFile('out.mp4'),10000,'read').then(function(data){
               if(!data||!data.length){resolve(bail());return;}
               try{ff.deleteFile(name);}catch(_){}
@@ -2085,6 +2087,9 @@ function openVideoModal(blob,mime){
   top.textContent='⬇ Скачать видео';
   top.addEventListener('click',function(){var a=document.createElement('a');a.href=url;a.download='slide.'+ext;document.body.appendChild(a);a.click();a.remove();});
   imgs.appendChild(top);
+  var hint=document.createElement('div');hint.style.cssText='font-size:12px;line-height:1.4;color:var(--ui-mute,#888);text-align:center;max-width:300px;margin:0 auto 6px';
+  hint.innerHTML='📱 на айфоне ролик сначала падает в «Загрузки». Чтобы он оказался в галерее — открой его там и нажми «Поделиться → Сохранить видео». Либо удержи палец на видео выше → «Сохранить видео».';
+  imgs.appendChild(hint);
   var wrap=document.createElement('div');wrap.style.cssText='display:flex;flex-direction:column;gap:8px;align-items:center';
   var vid=document.createElement('video');vid.src=url;vid.style.maxHeight='68vh';vid.style.maxWidth='92vw';
   /* loop=false нарочно: с нативным loop=true iOS Safari на blob-видео (наша запись) не всегда шлёт 'ended' и зависает на
