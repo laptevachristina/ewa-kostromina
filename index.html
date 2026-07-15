@@ -1979,22 +1979,27 @@ function exportVideo(format){
     var rctx=recCanvas.getContext('2d');
     var stream=recCanvas[capFn](VIDEO_FPS);
     var clipEls=Array.prototype.slice.call(el.querySelectorAll('.vidclip video'));
-    /* подмешиваем ОРИГИНАЛЬНЫЙ ЗВУК из видео-клипов в запись: каждый клип заводим через Web Audio
-       в MediaStreamDestination и добавляем аудиодорожку в общий поток. К ctx.destination НЕ подключаем,
-       поэтому во время записи звук на колонках не звучит — он идёт только в финальный ролик. */
+    /* подмешиваем ОРИГИНАЛЬНЫЙ ЗВУК из видео-клипов в запись: заводим MediaStreamDestination и кладём
+       её аудиотрек в общий поток. Сам звук запускаем не из «живого» видео-элемента (он играет сам по себе
+       и рассинхронизируется с картинкой), а из декодированного AudioBuffer строго в момент старта записи. */
+    var aDest=null,audioBuffers=[],audioSrcNodes=[];
     try{
       if(clipEls.length){
         window._appAC=window._appAC||new (window.AudioContext||window.webkitAudioContext)();
         var ac=window._appAC;
         if(ac.state==='suspended')ac.resume();
-        var aDest=ac.createMediaStreamDestination();
-        clipEls.forEach(function(v){
-          if(!v.__aSrc){try{v.__aSrc=ac.createMediaElementSource(v);}catch(_){}}
-          if(v.__aSrc){try{v.__aSrc.connect(aDest);}catch(_){}}
-        });
+        aDest=ac.createMediaStreamDestination();
         (aDest.stream.getAudioTracks()||[]).forEach(function(t){try{stream.addTrack(t);}catch(_){}});
       }
     }catch(_){}
+    function decodeClipAudio(v){
+      try{
+        var ac=window._appAC;
+        return fetch(v.src).then(function(r){return r.arrayBuffer();}).then(function(ab){
+          return new Promise(function(res){ ac.decodeAudioData(ab.slice(0),function(buf){res(buf);},function(){res(null);}); });
+        });
+      }catch(_){return Promise.resolve(null);}
+    }
     var chunks=[];
     var recorder=new MediaRecorder(stream,{mimeType:mime});
     recorder.ondataavailable=function(e){if(e.data&&e.data.size)chunks.push(e.data);};
@@ -2023,11 +2028,14 @@ function exportVideo(format){
     return Promise.all(clipEls.map(function(v,idx){
       var vc=v.closest('.vidclip');
       var targetW=(vc?vc.offsetWidth:180)*ES,targetH=(vc?vc.offsetHeight:320)*ES;
-      return prerenderClipFrames(v,targetW,targetH,function(f){
+      var vidP=prerenderClipFrames(v,targetW,targetH,function(f){
         prepFracs[idx]=f;
         var avg=prepFracs.reduce(function(a,b){return a+b;},0)/prepFracs.length;
         showProgress(avg*prepWeight);
       }).then(function(res){return {v:v,res:res};});
+      /* параллельно декодируем аудиодорожку клипа в AudioBuffer (для точной синхронизации с записью) */
+      var audP=decodeClipAudio(v).then(function(buf){audioBuffers[idx]=buf;});
+      return Promise.all([vidP,audP]).then(function(){return vidP;});
     })).then(function(prepared){
       var frameMs=1000/VIDEO_FPS;
       var total=Math.max(1,Math.ceil(fullMs/frameMs));
@@ -2065,11 +2073,25 @@ function exportVideo(format){
       }
       function startRecording(){
         recorder.start();
-        resumeClips(); /* запускаем клипы — их оригинальный звук через Web Audio идёт в дорожку записи */
+        /* звук из AudioBuffer стартует строго в момент recorder.start → синхронно с картинкой */
+        try{
+          var ac=window._appAC;
+          if(ac&&aDest&&audioBuffers.length){
+            if(ac.state==='suspended')ac.resume();
+            audioBuffers.forEach(function(buf){
+              if(!buf)return;
+              var src=ac.createBufferSource();src.buffer=buf;src.loop=true;src.connect(aDest);src.start(0);
+              audioSrcNodes.push(src);
+            });
+          }
+        }catch(_){}
         setFFStatus('запись…');
         var fi=0;
         (function tick(){
-          if(fi>=frames.length){resumeClips();recorder.stop();return;}
+          if(fi>=frames.length){
+            try{audioSrcNodes.forEach(function(s){try{s.stop();}catch(_){}});}catch(_){}
+            recorder.stop();return;
+          }
           var f=frames[fi];
           rctx.clearRect(0,0,recCanvas.width,recCanvas.height);
           if(f)rctx.drawImage(f,0,0,recCanvas.width,recCanvas.height);
@@ -2165,8 +2187,9 @@ function ensureMp4(blob,mime,onStatus){
         /* ВСЕГДА перекод в постоянные 30 fps (CFR) — запись идёт с переменным fps, из-за чего
            CapCut/Instagram спотыкаются и ролик дёргается/виснет. libx264 baseline+yuv420p+faststart
            работает везде. -fps_mode cfr -r 30 выравнивает тайминги. */
-        var args=['-i',name,'-c:v','libx264','-profile:v','baseline','-level','3.1','-pix_fmt','yuv420p',
-                  '-preset','ultrafast','-r','30','-fps_mode','cfr','-c:a','aac','-b:a','128k','-movflags','+faststart','out.mp4'];
+        var args=['-i',name,'-c:v','libx264','-pix_fmt','yuv420p',
+                  '-preset','ultrafast','-r','30','-fps_mode','cfr','-bf','0','-g','30',
+                  '-c:a','aac','-b:a','128k','-movflags','+faststart','out.mp4'];
         ff.on('progress',function(p){if(onStatus)try{onStatus('обработка…',Math.max(0,Math.min(1,p.progress||0)));}catch(_){}});
         withTimeout(ff.writeFile(name,new Uint8Array(fr.result)),20000,'write').then(function(){
           withTimeout(ff.exec(args),180000,'exec').then(function(){
