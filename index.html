@@ -2025,18 +2025,9 @@ function exportVideo(format){
     var prepWeight=clipEls.length?0.5:0;
     var prepFracs=clipEls.map(function(){return 0;});
     function showProgress(frac){btn.textContent='⏳ '+Math.round(Math.max(0,Math.min(1,frac))*100)+'%';}
-    return Promise.all(clipEls.map(function(v,idx){
-      var vc=v.closest('.vidclip');
-      var targetW=(vc?vc.offsetWidth:180)*ES,targetH=(vc?vc.offsetHeight:320)*ES;
-      var vidP=prerenderClipFrames(v,targetW,targetH,function(f){
-        prepFracs[idx]=f;
-        var avg=prepFracs.reduce(function(a,b){return a+b;},0)/prepFracs.length;
-        showProgress(avg*prepWeight);
-      }).then(function(res){return {v:v,res:res};});
-      /* параллельно декодируем аудиодорожку клипа в AudioBuffer (для точной синхронизации с записью) */
-      var audP=decodeClipAudio(v).then(function(buf){audioBuffers[idx]=buf;});
-      return Promise.all([vidP,audP]).then(function(){return vidP;});
-    })).then(function(prepared){
+    /* предрендер кадров клипа УБРАН (вис на айфоне): видео рисуется напрямую из <video>
+         в момент записи (drawImage video element в renderSlideCanvas), звук — через Web Audio. */
+      return Promise.resolve([]).then(function(prepared){
       var frameMs=1000/VIDEO_FPS;
       var total=Math.max(1,Math.ceil(fullMs/frameMs));
       var frames=[];
