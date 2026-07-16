@@ -150,7 +150,7 @@ em{font-style:italic}
 .vidclip{position:absolute;touch-action:none;cursor:move}
 .vidclip video{width:100%;height:100%;object-fit:contain;background:#000;pointer-events:none;display:block;border-radius:5%;overflow:hidden}
 .vidclip .cut-canvas{position:absolute;inset:0;width:100%;height:100%;display:none;pointer-events:none;border-radius:5%}
-.vidclip.cut-on .cut-canvas{display:block}
+.vidclip.cut-on .cut-canvas{display:block;pointer-events:auto;cursor:crosshair}
 .vidclip.cut-on video{opacity:0}
 .vidclip .cut-toggle{position:absolute;top:-22px;right:66px;width:44px;height:44px;z-index:10;cursor:pointer;touch-action:none;display:none}
 .vidclip .cut-toggle:before{content:'\2702';position:absolute;top:11px;left:0;width:44px;text-align:center;color:#fff;font-size:18px;text-shadow:0 1px 3px rgba(0,0,0,.6)}
@@ -1050,13 +1050,13 @@ function autoBgColor(video){
   var H=c.height=Math.max(2,W*(video.videoHeight||1)/((video.videoWidth||1)));
   try{c.getContext('2d').drawImage(video,0,0,W,H);}catch(_){return null;}
   var d;try{d=c.getContext('2d').getImageData(0,0,W,H).data;}catch(_){return null;}
-  // средний цвет краёв (периметр)
-  var r=0,g=0,b=0,n=0;
-  function add(x,y){var i=(y*W+x)*4;r+=d[i];g+=d[i+1];b+=d[i+2];n++;}
-  for(var x=0;x<W;x+=3){add(x,0);add(x,H-1);}
-  for(var y=0;y<H;y+=3){add(0,y);add(W-1,y);}
-  r=Math.round(r/n);g=Math.round(g/n);b=Math.round(b/n);
-  return (r<<16)|(g<<8)|b;
+  // самый СВЕТЛЫЙ пиксель краёв — обычно это однородный фон (белая стена/студия),
+  // тогда волосы/плечи (тёмное) не унесут автоцвет в темноту
+  var bestR=0,bestG=0,bestB=0,bestLum=-1;
+  function look(x,y){var i=(y*W+x)*4;var lum=d[i]+d[i+1]+d[i+2];if(lum>bestLum){bestLum=lum;bestR=d[i];bestG=d[i+1];bestB=d[i+2];}}
+  for(var x=0;x<W;x+=2){look(x,0);look(x,H-1);}
+  for(var y=0;y<H;y+=2){look(0,y);look(W-1,y);}
+  return (bestR<<16)|(bestG<<8)|bestB;
 }
 function videoCutLoop(vc){
   var v=vc.querySelector('video'),cv=vc.querySelector('.cut-canvas');if(!v||!cv)return;
@@ -1094,6 +1094,7 @@ function toggleCut(vc){
     vc.dataset.cutThresh=vc.dataset.cutThresh||'0.4';
     vc.classList.add('cut-on');
     videoCutLoop(vc);
+    setTimeout(function(){alert('✂ Включено. Тапни по ФОНУ в кадре — приложение возьмёт его цвет для удаления. Дальше — ползунком настрой допуск.');},50);
   }else{
     vc.classList.remove('cut-on');
   }
@@ -1165,6 +1166,23 @@ function wireVideoClip(vc){
   if(cutSliderEl){
     cutSliderEl.addEventListener('pointerdown',function(e){e.stopPropagation();});
     cutSliderEl.addEventListener('input',function(){vc.dataset.cutThresh=(cutSliderEl.value/100).toFixed(2);});
+  }
+  var cutCanvas=vc.querySelector(':scope>.cut-canvas');
+  if(cutCanvas){
+    cutCanvas.addEventListener('pointerdown',function(e){
+      /* пипетка: тап по точке = новый цвет фона для удаления */
+      e.preventDefault();e.stopPropagation();
+      var v=vc.querySelector('video');if(!v||!v.videoWidth)return;
+      var r=cutCanvas.getBoundingClientRect();
+      var x=Math.round((e.clientX-r.left)/r.width*(v.videoWidth));
+      var y=Math.round((e.clientY-r.top)/r.height*(v.videoHeight));
+      var off=document.createElement('canvas');off.width=v.videoWidth;off.height=v.videoHeight;
+      try{
+        off.getContext('2d').drawImage(v,0,0,v.videoWidth,v.videoHeight);
+        var d=off.getContext('2d').getImageData(x,y,1,1).data;
+        vc.dataset.cutColor=String((d[0]<<16)|(d[1]<<8)|d[2]);
+      }catch(_){}
+    });
   }
   var pointers={},mode=null,sx,sy,bl,bt,baseW,baseH,startDist,downX,downY,moved;
   function startMove(e){sx=e.clientX;sy=e.clientY;bl=parseFloat(vc.style.left)||0;bt=parseFloat(vc.style.top)||0;mode='move';}
