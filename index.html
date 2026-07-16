@@ -2052,6 +2052,7 @@ function exportVideo(format){
          (предрендер вис на айфоне). Кадры видео-кружка берём из prepared (они предрендерены отдельно, быстро).
          Звук — через captureStream из видео-элемента (resumeClips). Сервер потом соберёт честный MP4. */
       var frames=[];
+      _recording=true;_ovCache=new Map(); /* кеш overlay — иначе SVG-decode каждый кадр вешает айфон */
       recorder.start();
       resumeClips();
       setFFStatus('запись…');
@@ -2064,7 +2065,7 @@ function exportVideo(format){
           else { try{recorder.stop();}catch(_){} }
           return;
         }
-        var anim=animStateAt(items,elapsed,spinMode,typeSchedule);
+        var anim=null; /* статичный текст ради скорости; pulse кнопок восстановим в v49 */
         var vfm=new Map();
         prepared.forEach(function(p){ if(!p.res.frames.length)return; var idx=Math.floor((elapsed/1000)*p.res.fps)%p.res.frames.length; var bmp=p.res.frames[idx]; if(bmp)vfm.set(p.v,bmp); });
         withTimeout(renderSlideCanvas(el,anim,vfm),2500).then(function(canvas){
@@ -2090,6 +2091,7 @@ function exportVideo(format){
       var gifResolve; var gifDone=new Promise(function(r){gifResolve=r;});
       if(exportFormat==='gif'){ return gifDone; }
       return stopped.then(function(blob){
+        _recording=false;
         frames.length=0; prepared.forEach(function(p){p.res.frames.length=0;});
         return {blob:blob,mime:mime};
       });
