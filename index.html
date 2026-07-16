@@ -1950,6 +1950,17 @@ function exportVideo(format){
   var btn=gifBtn,oldText=btn.textContent;btn.disabled=true;btn.textContent='⏳ …';
   document.fonts.ready.then(function(){
     var el=slides[cur].el;
+    /* слайд с видео-кружком → серверная склейка (/compose), без realtime-записи */
+    if(el.querySelector('.vidclip')){
+      exportCompose(el).then(function(res){
+        hideFFStatus();videoExportBusy=false;btn.disabled=false;btn.textContent=oldText;
+        openVideoModal(res.blob,res.mime);
+      })['catch'](function(e){
+        hideFFStatus();videoExportBusy=false;btn.disabled=false;btn.textContent=oldText;
+        alert('Не получилось собрать видео — напиши мне. ('+(e&&e.message||'')+')');
+      });
+      return;
+    }
     var items=getAnimItems(el);
     var spinMode=hasSpinningSticker(items);
     var typeSchedule=buildTypeSchedule(items);
@@ -2150,6 +2161,34 @@ function serverProcess(blob){
     if(!r.ok)throw new Error('server '+r.status);
     return r.blob();
   }).then(function(b){return {blob:b,mime:'video/mp4'};});
+}
+/* ВАРИАНТ Б — серверная склейка: фон(PNG) + видео-кружок(circle) + звук → MP4.
+   Применяется когда на слайде есть видео-кружок. Не виснет на iOS — айфон рендерит только
+   один PNG фона (быстро), остальное делает серверный ffmpeg. */
+function exportCompose(el){
+  var vid=el.querySelector('.vidclip video');
+  var vc=vid?vid.closest('.vidclip'):null;
+  if(!vid||!vc)return Promise.reject(new Error('no vidclip'));
+  var ES=2; /* renderSlideCanvas рисует в 2× разрешении */
+  var x=vc.offsetLeft*ES, y=vc.offsetTop*ES, w=vc.offsetWidth*ES, h=vc.offsetHeight*ES;
+  var dur=(vid.duration&&isFinite(vid.duration))?vid.duration:5;
+  var oldDisp=vc.style.display;
+  setFFStatus('⏳ фон…');
+  vc.style.display='none'; /* прячем кружок — в фоне его нарисует сервер */
+  return renderSlideCanvas(el,null,null).then(function(canvas){
+    vc.style.display=oldDisp;
+    return new Promise(function(res){canvas.toBlob(function(b){res(b);},'image/png');});
+  }).then(function(bg){
+    setFFStatus('⏳ сервер…');
+    return fetch(vid.src).then(function(r){return r.blob();}).then(function(vblob){
+      var meta=JSON.stringify({x:Math.round(x),y:Math.round(y),w:Math.round(w),h:Math.round(h),dur:dur,shape:'circle'});
+      var fd=new FormData();
+      fd.append('bg',bg,'bg.png');
+      fd.append('video',vblob,'video.mp4');
+      fd.append('meta',meta);
+      return fetch(EWA_SERVER+'/compose',{method:'POST',body:fd});
+    }).then(function(r){if(!r.ok)throw new Error('compose '+r.status);return r.blob();});
+  }).then(function(mp4){return {blob:mp4,mime:'video/mp4'};});
 }
 function ensureMp4(blob,mime,onStatus){
   var raw={blob:blob,mime:mime};
