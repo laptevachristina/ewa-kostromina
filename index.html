@@ -2125,15 +2125,17 @@ function exportVideo(format){
     /* GIF не требует ffmpeg — отдаём сразу */
     if(res.mime==='image/gif'){ hideFFStatus(); videoExportBusy=false;btn.disabled=false;btn.textContent=oldText; openVideoModal(res.blob,res.mime); return; }
     /* статус показываем отдельной плашкой сверху — кнопка-иконка узкая, текст в неё не влезает */
-    showFFStatus('⏳ кодек…');
-    return ensureMp4(res.blob,res.mime,function(status,frac){setFFStatus('⏳ '+(status||'обработка')+(frac?(' '+Math.round(frac*100)+'%'):''));}).then(function(r){
-      hideFFStatus();
-      videoExportBusy=false;btn.disabled=false;btn.textContent=oldText;
+    /* сначала сервер (быстро: ~1 сек, есть звук), при сбое/оффлайне — локальный ffmpeg.wasm */
+    showFFStatus('⏳ сервер…');
+    return serverProcess(res.blob).then(function(r){
+      hideFFStatus();videoExportBusy=false;btn.disabled=false;btn.textContent=oldText;
       openVideoModal(r.blob,r.mime);
     },function(){
-      hideFFStatus();
-      videoExportBusy=false;btn.disabled=false;btn.textContent=oldText;
-      openVideoModal(res.blob,res.mime); /* ffmpeg сломался — отдаём как есть */
+      showFFStatus('⏳ кодек…');
+      return ensureMp4(res.blob,res.mime,function(status,frac){setFFStatus('⏳ '+(status||'обработка')+(frac?(' '+Math.round(frac*100)+'%'):''));}).then(function(r){
+        hideFFStatus();videoExportBusy=false;btn.disabled=false;btn.textContent=oldText;
+        openVideoModal(r.blob,r.mime);
+      },function(){ hideFFStatus();videoExportBusy=false;btn.disabled=false;btn.textContent=oldText; openVideoModal(res.blob,res.mime); });
     });
   }).catch(function(e){
     hideFFStatus();
@@ -2171,6 +2173,16 @@ function loadFFmpeg(onStatus){
     ff.load({coreURL:FF_BASE+'ffmpeg-core.js',wasmURL:FF_BASE+'ffmpeg-core.wasm'}).then(function(){_ff=ff;resolve(ff);},reject);
   });
   return withTimeout(_ffP,45000,'load');
+}
+var EWA_SERVER='https://72.56.9.229.sslip.io';
+/* видео → сервер → честный MP4 со звуком + faststart за ~секунду. Сервер = наш ffmpeg на Timeweb. */
+function serverProcess(blob){
+  var ext=(blob.type||'').indexOf('webm')>=0?'webm':'mp4';
+  var fd=new FormData();fd.append('file',blob,'in.'+ext);
+  return fetch(EWA_SERVER+'/process',{method:'POST',body:fd}).then(function(r){
+    if(!r.ok)throw new Error('server '+r.status);
+    return r.blob();
+  }).then(function(b){return {blob:b,mime:'video/mp4'};});
 }
 function ensureMp4(blob,mime,onStatus){
   var raw={blob:blob,mime:mime};
