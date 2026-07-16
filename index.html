@@ -2048,73 +2048,47 @@ function exportVideo(format){
                        function(e){if(!settled){settled=true;clearTimeout(timer);rej(e);}});
         });
       }
-      /* ПРЕДРЕНДЕР: считаем все кадры анимации заранее — в половинном разрешении (ES=1), иначе память
-         айфона не вывезет на длинных роликах; запись потом масштабирует до полного. Так тяжёлый декод
-         SVG-слоя уходит из реального времени → запись плавная, а анимация (появление текста, скролл,
-         вращение стикера, видео в кружке) сохраняется полностью. */
-      showFFStatus('расчёт кадров…');
-      function renderFrame(i){
-        var elapsed=Math.min(i*frameMs,fullMs);
+      /* REALTIME-запись (v47): кадры рендерятся и пишутся в момент, без предрендера всего слайда
+         (предрендер вис на айфоне). Кадры видео-кружка берём из prepared (они предрендерены отдельно, быстро).
+         Звук — через captureStream из видео-элемента (resumeClips). Сервер потом соберёт честный MP4. */
+      var frames=[];
+      recorder.start();
+      resumeClips();
+      setFFStatus('запись…');
+      var t0=performance.now();
+      (function tick(){
+        var elapsed=performance.now()-t0;
+        if(elapsed>=fullMs||elapsed>fullMs+8000){
+          try{clipEls.forEach(function(v){v.pause();});}catch(_){}
+          if(exportFormat==='gif'){ assembleGif(frames); }
+          else { try{recorder.stop();}catch(_){} }
+          return;
+        }
         var anim=animStateAt(items,elapsed,spinMode,typeSchedule);
         var vfm=new Map();
-        prepared.forEach(function(p){
-          if(!p.res.frames.length)return;
-          var idx=Math.floor((elapsed/1000)*p.res.fps)%p.res.frames.length;
-          var bmp=p.res.frames[idx]; if(bmp)vfm.set(p.v,bmp);
-        });
-        return withTimeout(renderSlideCanvas(el,anim,vfm,1),6000);
-      }
-      function renderNext(i){
-        if(i>=total){ if(exportFormat==='gif') startGifAssembly(); else startRecording(); return; }
-        setFFStatus('расчёт '+Math.round((i/total)*100)+'%');
-        renderFrame(i).then(function(c){frames.push(c);renderNext(i+1);},
-          function(){ /* сбой кадра — дублируем последний, чтобы не рвалось */
-            frames.push(frames.length?frames[frames.length-1]:null);renderNext(i+1);});
-      }
-      function startRecording(){
-        recorder.start();
-        /* звук из AudioBuffer стартует строго в момент recorder.start → синхронно с картинкой */
-        try{
-          var ac=window._appAC;
-          if(ac&&aDest&&audioBuffers.length){
-            if(ac.state==='suspended')ac.resume();
-            audioBuffers.forEach(function(buf){
-              if(!buf)return;
-              var src=ac.createBufferSource();src.buffer=buf;src.loop=true;src.connect(aDest);src.start(0);
-              audioSrcNodes.push(src);
-            });
-          }
-        }catch(_){}
-        setFFStatus('запись…');
-        var fi=0;
-        (function tick(){
-          if(fi>=frames.length){
-            try{audioSrcNodes.forEach(function(s){try{s.stop();}catch(_){}});}catch(_){}
-            recorder.stop();return;
-          }
-          var f=frames[fi];
+        prepared.forEach(function(p){ if(!p.res.frames.length)return; var idx=Math.floor((elapsed/1000)*p.res.fps)%p.res.frames.length; var bmp=p.res.frames[idx]; if(bmp)vfm.set(p.v,bmp); });
+        withTimeout(renderSlideCanvas(el,anim,vfm),2500).then(function(canvas){
           rctx.clearRect(0,0,recCanvas.width,recCanvas.height);
-          if(f)rctx.drawImage(f,0,0,recCanvas.width,recCanvas.height);
-          fi++;
-          setTimeout(tick,frameMs);
-        })();
-      }
-      /* GIF-сборка (для CapCut; без звука). Берём те же предрендеренные кадры, гоним через gif.js. */
-      function startGifAssembly(){
-        if(!window.GIF){gifResolve({blob:null,mime:'image/gif'});return;}
+          rctx.drawImage(canvas,0,0);
+          if(exportFormat==='gif'){ try{frames.push(canvas);}catch(_){} }
+          var spent=performance.now()-t0;
+          var next=Math.max(0, Math.round(frameMs-(spent%frameMs)));
+          setTimeout(tick, next);
+        }, function(){ setTimeout(tick,frameMs); });
+      })();
+      function assembleGif(frames){
+        if(!window.GIF||!frames.length){gifResolve({blob:null,mime:'image/gif'});return;}
         setFFStatus('сборка GIF…');
-        var GW=frames[0]?frames[0].width:w, GH=frames[0]?frames[0].height:h;
+        var GW=frames[0].width,GH=frames[0].height;
         var gif=new GIF({workers:2,quality:12,width:GW,height:GH,workerScript:'https://unpkg.com/gif.js@0.2.0/dist/gif.worker.js'});
         var delay=Math.round(1000/VIDEO_FPS);
         frames.forEach(function(f){ if(f) try{gif.addFrame(f,{delay:delay});}catch(_){} });
         gif.on('progress',function(p){ setFFStatus('сборка GIF '+Math.round(p*100)+'%'); });
-        gif.on('finished',function(blob){ gifResolve({blob:blob,mime:'image/gif'}); });
+        gif.on('finished',function(blob){ frames.length=0; prepared.forEach(function(p){p.res.frames.length=0;}); gifResolve({blob:blob,mime:'image/gif'}); });
         gif.render();
       }
-      var gifResolve;
-      var gifDone=new Promise(function(r){ gifResolve=r; });
-      renderNext(0);
-      if(exportFormat==='gif'){ return gifDone.then(function(r){ frames.length=0; prepared.forEach(function(p){p.res.frames.length=0;}); return r; }); }
+      var gifResolve; var gifDone=new Promise(function(r){gifResolve=r;});
+      if(exportFormat==='gif'){ return gifDone; }
       return stopped.then(function(blob){
         frames.length=0; prepared.forEach(function(p){p.res.frames.length=0;});
         return {blob:blob,mime:mime};
