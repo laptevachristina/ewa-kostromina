@@ -2091,9 +2091,9 @@ function renderSlideCanvas(el,animState,videoFrameMap,forceES){
         photosBelow.forEach(drawPhoto);
         ctx.drawImage(overlay,0,0,w,h);
         photosAbove.forEach(drawPhoto);
-        stickersAbove.forEach(drawSticker);
         vidsAbove.forEach(drawVid);
-        resolve(c);
+
+        stickersAbove.forEach(drawSticker);        resolve(c);
       }catch(e){reject(e);}
     }
     if(cached){compose(cached);return;}
